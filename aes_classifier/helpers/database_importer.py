@@ -22,7 +22,7 @@ data_source = []
 
 for line in file:
     line = line.strip().split(' ')
-    data_source.append({ 'external_id': line[0], 'dataset_name': 'AVA' })
+    data_source.append({ 'external_id': line[1], 'dataset_name': 'AVA' })
 
 print('datasource built with {0} entries'.format(len(data_source)))
 

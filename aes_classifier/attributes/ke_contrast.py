@@ -1,7 +1,7 @@
 from ml_buff.models.base_feature_record import BaseFeatureRecord
 import cv2
 
-IMAGE_PATH = '../../AVA_dataset/image'
+IMAGE_PATH = '/home/bruno/Downloads/images4AVA'
 
 class KeContrast(BaseFeatureRecord):
     def calculate(self, input_data):
@@ -16,5 +16,5 @@ class KeContrast(BaseFeatureRecord):
             else:
                 histogram = cv2.calcHist([channel], [0], None, [8], [0, 256])
 
-            return cv2.normalize(histogram, histogram)
+        return cv2.normalize(histogram, histogram)
 
