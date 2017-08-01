@@ -7,6 +7,7 @@ from ml_buff.models.base_feature_repository import BaseFeatureRepository
 from attributes.ke_contrast import KeContrast
 
 DATASET_IMAGES_PATH = r'../../AVA_dataset/image'
+IMAGE_PATH = '/home/bruno/Downloads/images4AVA'
 
 input_ids = BaseInputDataRepository().getAllForDataset('AVA')
 
@@ -29,3 +30,9 @@ print('dataset loaded with {0} instances'.format(len(input_data)))
 print('dataset loaded with {0} instances'.format(input_data[10]))
 
 # FeatureValueHelper.createAll(input_data)
+laplacian = np.array([[2/12, 8/12, 2/12], [8/12, -3, 8/12], [2/12, 8/12, 2/12]])
+
+for i in range(0, 255530):
+    image = cv2.imread('{0}/{1}.jpg'.format(IMAGE_PATH, input_ids[j].id))
+    dst = cv2.filter2D(image, -1, laplacian)
+
