@@ -2,9 +2,9 @@ import cv2
 import math
 import os
 
-WHITE = [255, 255, 255]
-IMAGES_INPUT_FOLDER = "/home/bruno/Downloads/AVA_dataset/nature2/photos/negative"
-IMAGES_OUTPUT_FOLDER = "/home/bruno/Downloads/AVA_dataset/nature_resized_white/photos/negative"
+BLACK = [0, 0, 0]
+IMAGES_INPUT_FOLDER = "/home/bruno/Documents/AVA/nature2/photos/positive"
+IMAGES_OUTPUT_FOLDER = "/home/bruno/Documents/AVA/nature_resized/photos/positive"
 
 def resize(input_image, size):
     height, width, channels = input_image.shape
@@ -13,13 +13,13 @@ def resize(input_image, size):
         padding = size - math.floor(size/height * width)
         left = math.floor(padding/2)
         right = padding - left
-        return cv2.copyMakeBorder(result, 0, 0, left, right, cv2.BORDER_CONSTANT, value = WHITE)
+        return cv2.copyMakeBorder(result, 0, 0, left, right, cv2.BORDER_CONSTANT, value = BLACK)
     else:
         result = cv2.resize(input_image, (size, math.floor(size/width * height)), interpolation = cv2.INTER_AREA)
         padding = size - math.floor(size/width * height)
         top = math.floor(padding/2)
         bottom = padding - top
-        return cv2.copyMakeBorder(result,top,bottom,0,0,cv2.BORDER_CONSTANT,value = WHITE)
+        return cv2.copyMakeBorder(result,top,bottom,0,0,cv2.BORDER_CONSTANT,value = BLACK)
 
 def main():
     for filename in os.listdir(IMAGES_INPUT_FOLDER):
