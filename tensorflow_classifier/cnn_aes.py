@@ -5,12 +5,13 @@ import sys
 import time
 import numpy as np
 import tensorflow as tf
-from cnn_model import cnn_model_fn
+from tensorflow.python import debug as tf_debug
+from cnn_model import cnn_model_fn, simplified_cnn_model_fn
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
-TRAIN_FILE = 'dataset/nature_train_00000-of-00002.tfrecord'
-VALIDATION_FILE = 'dataset/nature_validation_00000-of-00002.tfrecord'
+TRAIN_FILES = [('dataset/nature_train_0000%d-of-00002.tfrecord' % i) for i in range(1)]
+VALIDATION_FILES = [('dataset/nature_validation_0000%d-of-00002.tfrecord' % i) for i in range(1)]
 
 FLAGS = None
 
@@ -60,12 +61,14 @@ def inputs(train, batch_size, num_epochs):
     must be run using e.g. tf.train.start_queue_runners().
     """
     if not num_epochs: num_epochs = None
-    filename = os.path.join(FLAGS.train_dir,
-                          TRAIN_FILE if train else VALIDATION_FILE)
+
+    filenames = []
+    for relative_path in TRAIN_FILES if train else VALIDATION_FILES:
+        filenames.append(os.path.join(FLAGS.train_dir, relative_path))
 
     with tf.name_scope('input'):
         filename_queue = tf.train.string_input_producer(
-            [filename], num_epochs=num_epochs)
+            filenames, num_epochs=num_epochs)
 
         # Even when reading in multiple threads, share the filename
         # queue.
@@ -78,7 +81,16 @@ def inputs(train, batch_size, num_epochs):
             [image, label], batch_size=batch_size, num_threads=2,
             capacity=100 + 3 * batch_size,
             # Ensures a minimum amount of shuffling of examples.
-            min_after_dequeue=100)
+            min_after_dequeue=50)
+
+        # Resample
+        #target_probs = np.array([0.5,0.5])
+        #images, labels = tf.contrib.training.stratified_sample(
+        #    [image],
+        #    label,
+        #    target_probs,
+        #    batch_size
+        #        )
 
         return images, labels
 
@@ -93,7 +105,7 @@ def train():
 
     sess = tf.Session()
 
-    images, labels = inputs(train = True, batch_size = 100, num_epochs = None)
+    images, labels = inputs(train = True, batch_size = 1, num_epochs = None)
 
     # Required. See below for explanation
     init = tf.initialize_all_variables()
@@ -141,19 +153,31 @@ def train():
     sess.close()
 
 def inputs_fn():
-    return inputs(train = True, batch_size = 100, num_epochs = None)
-
+    return inputs(train = True, batch_size = 16, num_epochs = None)
 
 def main(unused_argv):
+    session_config = tf.ConfigProto()
+    session_config.gpu_options.per_process_gpu_memory_fraction = 0.9
+    estimator_config = tf.estimator.RunConfig(session_config=session_config)
     classifier = tf.estimator.Estimator(
-        model_fn = cnn_model_fn, model_dir = "/tmp/estimator")
+        model_fn = simplified_cnn_model_fn, model_dir = "/tmp/estimator", config = estimator_config)
 
     # Set up logging for predictions
     tensors_to_log = {"probabilities": "softmax_tensor"}
     logging_hook = tf.train.LoggingTensorHook(
         tensors=tensors_to_log, every_n_iter=50)
 
-    classifier.train(input_fn = lambda: inputs(train = True, batch_size = 100, num_epochs = None), steps = 20000, hooks = [logging_hook])
+    hooks = [
+            logging_hook,
+           # tf_debug.LocalCLIDebugHook()
+            ]
+
+    classifier.train(input_fn = lambda: inputs(train=True, batch_size = 16, num_epochs = None), steps = 20000, hooks = hooks)
+    #accuracy_score = classifier.evaluate(input_fn = lambda: inputs(train=True, batch_size=16, num_epochs = 1))
+
+
+    #print("\nTest Accuracy: {0:f}\n".format(accuracy_score))
+
 
 
 if __name__ == "__main__":
@@ -165,4 +189,5 @@ if __name__ == "__main__":
         help='Directory with the training data.'
     )
     FLAGS, unparsed = parser.parse_known_args()
+    tf.reset_default_graph()
     tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
