@@ -10,8 +10,14 @@ from cnn_model import cnn_model_fn, simplified_cnn_model_fn
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
-TRAIN_FILES = [('dataset/nature_train_0000%d-of-00002.tfrecord' % i) for i in range(1)]
-VALIDATION_FILES = [('dataset/nature_validation_0000%d-of-00002.tfrecord' % i) for i in range(1)]
+TRAIN_FILES = [
+    "gs://ava-dataset/nature/nature_training_01of02.tfrecord",
+    "gs://ava-dataset/nature/nature_training_02of02.tfrecord"
+    ]
+VALIDATION_FILES = [
+    "gs://ava-dataset/nature/nature_test_01of02.tfrecord",
+    "gs://ava-dataset/nature/nature_test_02of02.tfrecord"
+    ]
 
 FLAGS = None
 
@@ -28,18 +34,17 @@ def read_and_decode(filename_queue):
         features={
             # We know the length of both fields. If not the
             # tf.VarLenFeature could be used
-            'image/class/label': tf.FixedLenFeature([], tf.int64),
-            'image/encoded': tf.FixedLenFeature([], tf.string),
-            'image/height': tf.FixedLenFeature([], tf.int64),
-            'image/width': tf.FixedLenFeature([], tf.int64)
+                'train/label': tf.FixedLenFeature([], tf.string),
+                'train/image': tf.FixedLenFeature([], tf.string)
         })
+
     # now return the converted data
-    label  = tf.cast(features['image/class/label'], tf.int64)
-    image  = tf.image.decode_jpeg(features['image/encoded'], channels = 3)
-    image  = tf.reshape(image, [200 * 200 * 3, ])
+    label = tf.cast(0 if features['train/label'] == "negative" else 1, dtype=tf.uint8)
+    #label = tf.cast(features['train/label'], dtype=tf.uint8)
+    image = tf.image.decode_jpeg(features['train/image'], channels = 3)
+    image = tf.image.resize_image_with_crop_or_pad(image, 200, 200)
     image  = tf.cast(image, tf.float32) * (1. / 255) - 0.5
-    width  = features['image/width']
-    height = features['image/height']
+    image.set_shape((200, 200, 3))
     return image, label
 
 def inputs(train, batch_size, num_epochs):
@@ -156,11 +161,8 @@ def inputs_fn():
     return inputs(train = True, batch_size = 16, num_epochs = None)
 
 def main(unused_argv):
-    session_config = tf.ConfigProto()
-    session_config.gpu_options.per_process_gpu_memory_fraction = 0.9
-    estimator_config = tf.estimator.RunConfig(session_config=session_config)
     classifier = tf.estimator.Estimator(
-        model_fn = simplified_cnn_model_fn, model_dir = "/tmp/estimator", config = estimator_config)
+        model_fn = simplified_cnn_model_fn, model_dir = FLAGS.model_dir)
 
     # Set up logging for predictions
     tensors_to_log = {"probabilities": "softmax_tensor"}
@@ -185,8 +187,14 @@ if __name__ == "__main__":
     parser.add_argument(
         '--train_dir',
         type=str,
-        default='/tmp/data',
+        default='',
         help='Directory with the training data.'
+    )
+    parser.add_argument(
+        '--model_dir',
+        type=str,
+        default='/tmp/estimator',
+        help='Directory with model data'
     )
     FLAGS, unparsed = parser.parse_known_args()
     tf.reset_default_graph()
