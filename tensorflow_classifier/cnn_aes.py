@@ -11,12 +11,12 @@ from cnn_model import cnn_model_fn, simplified_cnn_model_fn
 tf.logging.set_verbosity(tf.logging.INFO)
 
 TRAIN_FILES = [
-    "gs://ava-dataset/nature/nature_training_01of02.tfrecord",
-    "gs://ava-dataset/nature/nature_training_02of02.tfrecord"
+    "gs://ava-dataset//nature_training_01of02.tfrecord",
+    "gs://ava-dataset//nature_training_02of02.tfrecord"
     ]
 VALIDATION_FILES = [
-    "gs://ava-dataset/nature/nature_test_01of02.tfrecord",
-    "gs://ava-dataset/nature/nature_test_02of02.tfrecord"
+    "gs://ava-dataset//nature_test_01of02.tfrecord",
+    "gs://ava-dataset//nature_test_02of02.tfrecord"
     ]
 
 FLAGS = None
@@ -34,17 +34,17 @@ def read_and_decode(filename_queue):
         features={
             # We know the length of both fields. If not the
             # tf.VarLenFeature could be used
-                'train/label': tf.FixedLenFeature([], tf.string),
+                'train/label': tf.FixedLenFeature([], tf.int64),
                 'train/image': tf.FixedLenFeature([], tf.string)
         })
 
     # now return the converted data
-    label = tf.cast(0 if features['train/label'] == "negative" else 1, dtype=tf.uint8)
+    label = tf.cast(features['train/label'], dtype=tf.int64)
     #label = tf.cast(features['train/label'], dtype=tf.uint8)
     image = tf.image.decode_jpeg(features['train/image'], channels = 3)
-    image = tf.image.resize_image_with_crop_or_pad(image, 200, 200)
+    image = tf.image.resize_image_with_crop_or_pad(image, 400, 400)
     image  = tf.cast(image, tf.float32) * (1. / 255) - 0.5
-    image.set_shape((200, 200, 3))
+    image.set_shape((400, 400, 3))
     return image, label
 
 def inputs(train, batch_size, num_epochs):
@@ -162,10 +162,10 @@ def inputs_fn():
 
 def main(unused_argv):
     classifier = tf.estimator.Estimator(
-        model_fn = simplified_cnn_model_fn, model_dir = FLAGS.model_dir)
+        model_fn = cnn_model_fn, model_dir = FLAGS.model_dir)
 
     # Set up logging for predictions
-    tensors_to_log = {"probabilities": "softmax_tensor"}
+    tensors_to_log = {"probabilities": "softmax_tensor", "classes": "classes_tensor"}
     logging_hook = tf.train.LoggingTensorHook(
         tensors=tensors_to_log, every_n_iter=50)
 
@@ -174,7 +174,7 @@ def main(unused_argv):
            # tf_debug.LocalCLIDebugHook()
             ]
 
-    classifier.train(input_fn = lambda: inputs(train=True, batch_size = 16, num_epochs = None), steps = 20000, hooks = hooks)
+    classifier.train(input_fn = lambda: inputs(train=True, batch_size = 32, num_epochs = None), steps = 20000, hooks = hooks)
     #accuracy_score = classifier.evaluate(input_fn = lambda: inputs(train=True, batch_size=16, num_epochs = 1))
 
 
