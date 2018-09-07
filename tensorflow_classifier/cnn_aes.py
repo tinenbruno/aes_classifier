@@ -11,12 +11,12 @@ from cnn_model import cnn_model_fn, simplified_cnn_model_fn
 tf.logging.set_verbosity(tf.logging.INFO)
 
 TRAIN_FILES = [
-    "gs://ava-dataset//nature_training_01of02.tfrecord",
-    "gs://ava-dataset//nature_training_02of02.tfrecord"
+    "/home/bruno/model/nature_binary_fixed/nature_training_01of02.tfrecord",
+    "/home/bruno/model/nature_binary_fixed/nature_training_02of02.tfrecord"
     ]
 VALIDATION_FILES = [
-    "gs://ava-dataset//nature_test_01of02.tfrecord",
-    "gs://ava-dataset//nature_test_02of02.tfrecord"
+    "/home/bruno/model/nature_binary_fixed/nature_test_01of02.tfrecord",
+    "/home/bruno/model/nature_binary_fixed/nature_test_02of02.tfrecord"
     ]
 
 FLAGS = None
@@ -165,7 +165,7 @@ def main(unused_argv):
         model_fn = cnn_model_fn, model_dir = FLAGS.model_dir)
 
     # Set up logging for predictions
-    tensors_to_log = {"probabilities": "softmax_tensor", "classes": "classes_tensor"}
+    tensors_to_log = {"probabilities": "softmax_tensor"}
     logging_hook = tf.train.LoggingTensorHook(
         tensors=tensors_to_log, every_n_iter=50)
 
@@ -174,12 +174,23 @@ def main(unused_argv):
            # tf_debug.LocalCLIDebugHook()
             ]
 
-    classifier.train(input_fn = lambda: inputs(train=True, batch_size = 32, num_epochs = None), steps = 20000, hooks = hooks)
+    #classifier.train(input_fn = lambda: inputs(train=True, batch_size = 32, num_epochs = None), steps = 20000, hooks = hooks)
     #accuracy_score = classifier.evaluate(input_fn = lambda: inputs(train=True, batch_size=16, num_epochs = 1))
 
 
     #print("\nTest Accuracy: {0:f}\n".format(accuracy_score))
+    experiment = tf.contrib.learn.Experiment(
+        estimator = classifier,
+        train_input_fn = lambda: inputs(train=True, batch_size=64, num_epochs=None),
+	eval_input_fn = lambda: inputs(train=False, batch_size=64, num_epochs=1), 
+	train_steps = 15000,
+        train_monitors=hooks,
+        eval_steps = None,
+        min_eval_frequency = 1
+    )
 
+    experiment.continuous_train_and_eval()
+    #experiment.evaluate()
 
 
 if __name__ == "__main__":
@@ -193,7 +204,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '--model_dir',
         type=str,
-        default='/tmp/estimator',
+        default='/home/bruno/model/output/model3',
         help='Directory with model data'
     )
     FLAGS, unparsed = parser.parse_known_args()

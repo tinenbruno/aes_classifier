@@ -75,8 +75,9 @@ def cnn_model_fn(features, labels, mode):
             [batch_size, image_width, image_height, channels])
 
     # Convolutional Layer #1
+    norm1 = tf.layers.batch_normalization(input_layer)
     conv1 = tf.layers.conv2d(
-        inputs=input_layer,
+        inputs=norm1,
         filters=32,
         kernel_size=[3, 3],
         padding="same",
@@ -86,24 +87,52 @@ def cnn_model_fn(features, labels, mode):
     pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=[2, 2], strides=2)
 
     # Convolutional Layer #2 and Pooling Layer #2
+    norm2 = tf.layers.batch_normalization(pool1)
     conv2 = tf.layers.conv2d(
-        inputs=pool1,
+        inputs=norm2,
         filters=64,
         kernel_size=[5, 5],
         padding="same",
         activation=tf.nn.relu)
-    pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2, 2], strides=2)
 
+
+    norm22 = tf.layers.batch_normalization(conv2)
+    conv22 = tf.layers.conv2d(
+        inputs=norm22,
+        filters=32,
+        kernel_size=[5, 5],
+        padding="same",
+        activation=tf.nn.relu)
+    pool2 = tf.layers.max_pooling2d(inputs=conv22, pool_size=[2, 2], strides=2)
+
+    norm3 = tf.layers.batch_normalization(pool2)
     conv3 = tf.layers.conv2d(
-        inputs=pool2,
+        inputs=norm3,
         filters=64,
         kernel_size=[7, 7],
         padding="same",
         activation=tf.nn.relu)
-    pool3 = tf.layers.max_pooling2d(inputs=conv3, pool_size=[2, 2], strides=2)
+
+    norm4 = tf.layers.batch_normalization(conv3)
+    conv4 = tf.layers.conv2d(
+        inputs=norm4,
+        filters=64,
+        kernel_size=[7, 7],
+        padding="same",
+        activation=tf.nn.relu)
+    pool4 = tf.layers.max_pooling2d(inputs=conv4, pool_size=[2, 2], strides=2)
+
+    norm5 = tf.layers.batch_normalization(pool4)
+    conv5 = tf.layers.conv2d(
+        inputs=norm5,
+        filters=64,
+        kernel_size=[9, 9],
+        padding="same",
+        activation=tf.nn.relu)
+    pool5 = tf.layers.max_pooling2d(inputs=conv5, pool_size=[2, 2], strides=2)
 
     # Dense Layer
-    pool2_flat = tf.reshape(pool3, [-1, 50 * 50 * 64])
+    pool2_flat = tf.reshape(pool5, [-1, 25 * 25 * 64])
     dense = tf.layers.dense(inputs=pool2_flat, units=1024, activation=tf.nn.relu)
     dropout = tf.layers.dropout(
         inputs=dense, rate=0.4, training=mode == tf.estimator.ModeKeys.TRAIN)
@@ -112,8 +141,10 @@ def cnn_model_fn(features, labels, mode):
     # Our final layer has 2 units, representing the two final classes
     logits = tf.layers.dense(inputs=dropout, units=2)
     # logits = tf.nn.softmax(dropout)
+    #class_weights = tf.constant([0.28, 0.72])
+    #scaled_logits = tf.multiply(logits, class_weights)
 
-    onehot_labels = tf.one_hot(indices=tf.cast(labels, tf.int32), depth=2, name="classes_tensor")
+    onehot_labels = tf.one_hot(indices=tf.cast(labels, tf.int32), depth=2)
     predictions = _predictions(onehot_labels, logits)
 
     if mode == tf.estimator.ModeKeys.PREDICT:
@@ -134,12 +165,21 @@ def cnn_model_fn(features, labels, mode):
 #	    logits)
     #loss = tf.losses.softmax_cross_entropy(
     #    onehot_labels=onehot_labels, logits=logits)
-    class_weights = tf.multiply(onehot_labels, [0.28, 0.72])
-    loss = tf.losses.softmax_cross_entropy(class_weights,tf.reshape(logits, (-1, 2)))
+    #loss = tf.nn.softmax_cross_entropy_with_logits(logits = scaled_logits, labels = onehot_labels)
+    #loss = tf.losses.softmax_cross_entropy(onehot_labels=onehot_labels, logits=scaled_logits)
+    loss = tf.nn.weighted_cross_entropy_with_logits(
+      onehot_labels,
+      logits,
+      0.05,
+      name=None)
+    loss = tf.reduce_mean(loss)
+    tf.summary.scalar('loss', loss)
 
-    # Configure the Training Op (for TRAIN mode)
+    merged = tf.summary.merge_all()
+
+    #Configure the Training Op (for TRAIN mode)
     if mode == tf.estimator.ModeKeys.TRAIN:
-        optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.001)
+        optimizer = tf.train.AdamOptimizer(learning_rate=0.001)
         train_op = optimizer.minimize(
             loss=loss,
             global_step=tf.train.get_global_step())
